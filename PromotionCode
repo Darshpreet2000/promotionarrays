@@ -1,0 +1,38 @@
+private void promote(){
+     List<promotions> ON_PURCHASE_VALUE=new ArrayList<>();
+        List<promotions> ON_PURCHASE_ITEM=new ArrayList<>();
+     for(int i=0;i<promotionsList.size();i++){
+         promotions promote= promotionsList.get(i);
+         if(promote.getTarget().equals("ALL")){
+            if(promote.getCondition().equals("ON_PURCHASE_VALUE")){
+                ON_PURCHASE_VALUE.add(promote);
+                apply_promotion_service(promote);
+            }
+            else if(promote.getCondition().equals("ON_PURCHASE_ITEM")){
+                ON_PURCHASE_ITEM.add(promote);
+              }
+            }
+         }
+     }
+     private void apply_promotion_service(promotions CURRENTPROMOTION){
+          int getcarttotal;
+         CartModel cartModel = new CartModel();
+      List<OrderLineItemRestBean> items_list_of_cart = null;
+      //I will pass the original cart model here
+          BigDecimal orderTotal = cartModel.getOrderTotal();
+          getcarttotal=orderTotal.intValue();
+          int tempcartTotal;
+          List<ProductModel> excludelist=CURRENTPROMOTION.getExcludelist_of_value();
+         //Iterating from array of onpurchase value
+       for(int i=0;i<items_list_of_cart.size();i++){
+          OrderLineItemRestBean currentProduct=items_list_of_cart.get(i);
+     //check if this item is excluded or included
+           for(int j=0;j<excludelist.size();j++){
+               //current item is not in exclude list
+               if(!currentProduct.getProductSku().equals(excludelist.get(i).getSku())){
+                   tempcartTotal=  currentProduct.getOriginalPrice().intValue()+currentProduct.getQuantity();
+               }
+           }
+       }
+
+    }
