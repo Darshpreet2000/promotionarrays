@@ -1,105 +1,133 @@
-   List<promotions> ON_PURCHASE_VALUE = new ArrayList<>();
-    List<promotions> ON_PURCHASE_ITEM = new ArrayList<>();
 
- 
+ List<promotions> ON_PURCHASE_VALUE = new ArrayList<>();
+    List<promotions> ON_PURCHASE_ITEM = new ArrayList<>();
+    List<promotions> PURCHASE_VALUE_PROMOTIONS = new ArrayList<>();
+    List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
+
+
  private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
             if (promote.getTarget().equals("ALL")) {
                 if (promote.getCondition().equals("ON_PURCHASE_VALUE")) {
-                    apply_promotion_service(promote);
+                    ON_PURCHASE_VALUE.add(promote);
+                    apply_promotion_service();
                 } else if (promote.getCondition().equals("ON_PURCHASE_ITEM")) {
-                    apply_promotion_service2(promote);
+                    ON_PURCHASE_ITEM.add(promote);
+                    apply_promotion_service2();
                 }
             }
         }
-        List<promotions> concatenated=new ArrayList<promotions>(ON_PURCHASE_VALUE);
+        List<promotions> concatenated = new ArrayList<promotions>(ON_PURCHASE_VALUE);
         concatenated.addAll(ON_PURCHASE_ITEM);
     }
 
-    private void apply_promotion_service(promotions CURRENTPROMOTION) {
+    private void apply_promotion_service() {
         int getcarttotal;
-        CartModel cartModel = new CartModel();
-        List<OrderLineItemRestBean> items_list_of_cart = null;
-        //I will pass the original cart model here
-        BigDecimal orderTotal = cartModel.getOrderTotal();
-        getcarttotal = orderTotal.intValue();
-        int tempcartTotal = 0;
-        List<ProductModel> excludelist = CURRENTPROMOTION.getExcludelist_of_value();
-        //Iterating from array of onpurchase value
-        for (int i = 0; i < items_list_of_cart.size(); i++) {
-            OrderLineItemRestBean currentProduct = items_list_of_cart.get(i);
-            //check if this item is excluded or included
-            for (int j = 0; j < excludelist.size(); j++) {
-                //current item is not in exclude list
-                if (!currentProduct.getProductSku().equals(excludelist.get(i).getSku())) {
-                    tempcartTotal += currentProduct.getOriginalPrice().intValue() + currentProduct.getQuantity();
+        if (!ON_PURCHASE_VALUE.isEmpty()) {
+            for (int i = 0; i < ON_PURCHASE_VALUE.size(); i++) {
+                int tempCartTotal = 0;
+                //Iterating in cart now
+                promotions p = ON_PURCHASE_VALUE.get(i);
+                List<OrderLineItemRestBean> item = null;
+                //I will pass the original cart model here
+                for (int j = 0; j < item.size(); j++) {
 
-                    boolean condition1 = Integer.parseInt(CURRENTPROMOTION.getMin()) <= tempcartTotal;
+                    tempCartTotal += checkForIncludes(p, item.get(j)) ? item.get(j).getOriginalPrice().intValue() * item.get(j).getQuantity() : 0;
+                    //      item.get(j).getItemPromotions()=[];
+                    //        item.get(j).setDiscount(0);
 
-                    boolean condition2 = Integer.parseInt(CURRENTPROMOTION.getMax()) >= tempcartTotal;
+                    boolean condition1 = Boolean.parseBoolean(p.getMin()) ? Integer.parseInt(p.getMin()) <= tempCartTotal : true;
 
-                    boolean condition3 = Integer.parseInt(CURRENTPROMOTION.getFixed()) <= tempcartTotal;
+                    boolean condition2 = Boolean.parseBoolean(p.getMax()) ? Integer.parseInt(p.getMax()) >= tempCartTotal : true;
+
+                    boolean condition3 = Boolean.parseBoolean(p.getFixed()) ? Integer.parseInt(p.getFixed()) == tempCartTotal : true;
                     if (condition1 && condition2 && condition3) {
-                        ON_PURCHASE_VALUE.add(CURRENTPROMOTION);
+                        PURCHASE_VALUE_PROMOTIONS.add(p);
                     }
                 }
+
             }
+
         }
 
     }
 
-    private void apply_promotion_service2(promotions CURRENTPROMOTION) {
+    private void apply_promotion_service2() {
         //check if cumulative flag is true (p.promotionRule.cumulative);
-        if (CURRENTPROMOTION.isCumulative()) {
-            int tempcartitems = 0;
-            List<ProductModel> excludelist = CURRENTPROMOTION.getExcludelist_of_value();
-            List<OrderLineItemRestBean> items_list_of_cart = null;
-            //I will pass the original cart model here
-            for (int i = 0; i < items_list_of_cart.size(); i++) {
-                OrderLineItemRestBean currentProduct = items_list_of_cart.get(i);
-                //check if this item is excluded or included
-                for (int j = 0; j < excludelist.size(); j++) {
-                    //current item is not in exclude list
-                    if (!currentProduct.getProductSku().equals(excludelist.get(i).getSku())) {
 
-                        tempcartitems += currentProduct.getQuantity();
-                        boolean condition1 = Integer.parseInt(CURRENTPROMOTION.getMin()) <= tempcartitems;
+        if (!ON_PURCHASE_ITEM.isEmpty()) {
+            for (int i = 0; i < ON_PURCHASE_ITEM.size(); i++) {
+                int tempCartItems = 0;
+                //Iterating in cart now
+                promotions p = ON_PURCHASE_ITEM.get(i);
+                if (p.isCumulative()) {
+                    int tempcartitems = 0;
 
-                        boolean condition2 = Integer.parseInt(CURRENTPROMOTION.getMax()) >= tempcartitems;
+                    List<OrderLineItemRestBean> item = null;
+                    //I will pass the original cart model here
+                    for (int j = 0; j < item.size(); j++) {
 
-                        boolean condition3 = Integer.parseInt(CURRENTPROMOTION.getFixed()) <= tempcartitems;
+                        tempCartItems += checkForIncludes(p, item.get(j)) ? item.get(j).getOriginalPrice().intValue() * item.get(j).getQuantity() : 0;
+                        //      item.get(j).getItemPromotions()=[];
+                        //        item.get(j).setDiscount(0);
 
+                        boolean condition1 = Boolean.parseBoolean(p.getMin()) ? Integer.parseInt(p.getMin()) <= tempCartItems : true;
+
+                        boolean condition2 = Boolean.parseBoolean(p.getMax()) ? Integer.parseInt(p.getMax()) >= tempCartItems : true;
+
+                        boolean condition3 = Boolean.parseBoolean(p.getFixed()) ? Integer.parseInt(p.getFixed()) == tempCartItems : true;
                         if (condition1 && condition2 && condition3) {
-                            ON_PURCHASE_ITEM.add(CURRENTPROMOTION);
+                            PURCHASE_ITEM_PROMOTIONS.add(p);
+                        }
+
+                    }
+                } else {
+                    //If cumulative flag is false
+                    Map<String, Integer> individualItemCount = null;
+
+                    //I will pass the original cart model here
+                    List<OrderLineItemRestBean> item = null;
+                    //I will pass the original cart model here
+                    for (int j = 0; j < item.size(); j++) {
+                        individualItemCount.put(item.get(j).getHsn(), checkForIncludes(p, item.get(j)) ? item.get(j).getOriginalPrice().intValue() * item.get(j).getQuantity() : 0);
+                    }
+                    for (int j = 0; j < individualItemCount.size(); j++) {
+                        boolean condition1 = Boolean.parseBoolean(p.getMin()) ? Integer.parseInt(p.getMin()) <= individualItemCount.get(item.get(j).getHsn()) : true;
+
+                        boolean condition2 = Boolean.parseBoolean(p.getMax()) ? Integer.parseInt(p.getMax()) >= individualItemCount.get(item.get(j).getHsn()) : true;
+
+                        boolean condition3 = Boolean.parseBoolean(p.getFixed()) ? Integer.parseInt(p.getFixed()) == individualItemCount.get(item.get(j).getHsn()) : true;
+                        if (condition1 && condition2 && condition3) {
+                            PURCHASE_ITEM_PROMOTIONS.add(p);
                         }
                     }
                 }
             }
         }
-        else{
-            //If cumulative flag is false
-           Map<String,Integer> individualItemCount = null;
-            List<ProductModel> excludelist = CURRENTPROMOTION.getExcludelist_of_value();
-            List<OrderLineItemRestBean> items_list_of_cart = null;
-            //I will pass the original cart model here
-            for (int i = 0; i < items_list_of_cart.size(); i++) {
-                OrderLineItemRestBean currentProduct = items_list_of_cart.get(i);
-                //check if this item is excluded or included
-                for (int j = 0; j < excludelist.size(); j++) {
-                    //current item is not in exclude list
-                    if (!currentProduct.getProductSku().equals(excludelist.get(i).getSku())) {
-                        individualItemCount.put(currentProduct.getProductSku(),currentProduct.getQuantity());
-                        boolean condition1 = Integer.parseInt(CURRENTPROMOTION.getMin()) <= individualItemCount.get(currentProduct.getProductSku());
+    }
 
-                        boolean condition2 = Integer.parseInt(CURRENTPROMOTION.getMax()) >= individualItemCount.get(currentProduct.getProductSku());
+    private boolean checkForIncludes(promotions arr, OrderLineItemRestBean el) {
 
-                        boolean condition3 = Integer.parseInt(CURRENTPROMOTION.getFixed()) <= individualItemCount.get(currentProduct.getProductSku());
-                        if (condition1 && condition2 && condition3) {
-                            ON_PURCHASE_ITEM.add(CURRENTPROMOTION);
-                        }
-                    }
-                }
+        boolean inludeflag = ((arr.skuList.isEmpty() || getIndexByProperty(arr.skuList, el.getSkuid(), el.getSkuname()) != -1)
+                && (arr.brandList.isEmpty() || getIndexByProperty(arr.brandList, el.getBrandid(), el.getBrandname()) != -1)
+                && (arr.categoryList.isEmpty() || getIndexByProperty(arr.categoryList, el.getCategoryid(), el.getCategoryname()) != -1)
+                && (arr.tagList.isEmpty() || getIndexByProperty(arr.tagList, el.getTagid(), el.getTagname()) != -1));
+
+        boolean excludeflag = ((arr.eskuList.isEmpty() || getIndexByProperty(arr.eskuList, el.getSkuid(), el.getSkuname()) != -1)
+                && (arr.ebrandList.isEmpty() || getIndexByProperty(arr.ebrandList, el.getBrandid(), el.getBrandname()) != -1)
+                && (arr.ecategoryList.isEmpty() || getIndexByProperty(arr.ecategoryList, el.getCategoryid(), el.getCategoryname()) != -1)
+                && (arr.etagList.isEmpty() || getIndexByProperty(arr.etagList, el.getTagid(), el.getTagname()) != -1));
+
+        return inludeflag && excludeflag;
+    }
+
+    private int getIndexByProperty(List<ListModel> current, String id, String name) {
+        for (int i = 0; i < current.size(); i++) {
+            ListModel currentobj = current.get(i);
+            if (currentobj.getId().equals(id) && currentobj.getName().equals(name)) {
+                return i;
             }
-       }
+        }
+        return -1;
     }
