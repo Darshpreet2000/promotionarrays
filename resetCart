@@ -1,0 +1,20 @@
+ private void resetCart() {
+        List<OrderLineItemRestBean> item = null;
+        //I will pass the original cart model here
+        List<OrderLineItemRestBean> newCart = null;
+        HashMap<String, Integer> cartmap = null;
+        for (int j = 0; j < item.size(); j++) {
+            //I got the current item here
+            OrderLineItemRestBean currentItem = item.get(j);
+            if (cartmap.containsKey(currentItem.getSkuid())) {
+                //Then increase its Quantity
+                int Index = newCart.indexOf(currentItem);
+                int newItem = newCart.get(Index).getQuantity();
+                newCart.get(Index).setQuantity(newItem + currentItem.getQuantity());
+            } else {
+                //This item was not present earlier
+                cartmap.put(currentItem.getSkuid(), currentItem.getQuantity());
+                newCart.add(currentItem);
+            }
+        }
+    }
