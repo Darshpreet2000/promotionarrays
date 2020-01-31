@@ -4,7 +4,6 @@
     List<promotions> PURCHASE_VALUE_PROMOTIONS = new ArrayList<>();
     List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
 
-
  private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
@@ -20,6 +19,100 @@
         }
         List<promotions> concatenated = new ArrayList<promotions>(ON_PURCHASE_VALUE);
         concatenated.addAll(ON_PURCHASE_ITEM);
+
+        List<OrderLineItemRestBean> Cart = null;
+        //I will pass the original cart model here
+        for (int i = 0; i < concatenated.size(); i++) {
+            promotions current = concatenated.get(i);
+            if (current.getCondition().equals("ON_PURCHASE_VALUE")) {
+                if (i == 0) {
+                    Cart = resetCart(Cart);
+                    Cart = removeAllPromotion(Cart);
+                    if (recheckCartTotal(Cart, current)) {
+                        //  if received true proceed to c
+                        switch (current.getRewardType()) {
+                            case "ON_VALUE":
+                                for (int j = 0; j < Cart.size(); j++) {
+                                    OrderLineItemRestBean el = Cart.get(j);
+                                    BigDecimal AmountSaved = current.isDiscountInPercentage() ? (el.getOriginalPrice().precision() * current.getDiscountAmount() / 100) : ((el.getOriginalPrice() * ((((((el.getOriginalPrice() / cartTotal) * current.getDiscountAmount())) * 100) / el.getOriginalPrice()))) / 100);
+                                    el.setDiscount(AmountSaved);
+                                    LineItemPromotionBean p = null;
+                                    p.setPromotionId(current.getPromotionid());
+                                    p.setAmountSaved((BigDecimal.valueOf(el.getQuantity()).multiply(AmountSaved)));
+                                    p.setName(current.getPromotion());
+                                    p.setCoupon(current.getTarget() == "COUPON" ? true : false);
+                                    el.getItemPromotions().add(p);
+                                    el.setDiscount(el.getDiscount() += current.isDiscountInPercentage() ? current.getDiscountAmount() : (((((el.getOriginalPrice() / cartTotal) * current.getDiscountAmount()) * 100) / el.getOriginalPrice())), 100);
+                                }
+                                break;
+                            case "ON_ITEM":
+                                for (int j = 0; j < Cart.size(); j++) {
+
+                                }
+                                break;
+                            case "FIXED_PRICE":
+                                break;
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+
+    boolean recheckCartTotal(List<OrderLineItemRestBean> Cart, promotions p) {
+        int cartTotal = 0;
+        for (int i = 0; i < Cart.size(); i++) {
+            OrderLineItemRestBean currentItem = Cart.get(i);
+            int totalDiscount = 0;
+            for (int j = 0; j < currentItem.getItemPromotions().size(); j++) {
+                totalDiscount += currentItem.getItemPromotions().get(j).getAmountSaved().intValue();
+            }
+            cartTotal += (currentItem.getUnitPrice().intValue() * currentItem.getQuantity()) - totalDiscount;
+        }
+        boolean condition1 = Boolean.parseBoolean(p.getMin()) ? Integer.parseInt(p.getMin()) <= cartTotal : true;
+
+        boolean condition2 = Boolean.parseBoolean(p.getMax()) ? Integer.parseInt(p.getMax()) >= cartTotal : true;
+
+        boolean condition3 = Boolean.parseBoolean(p.getFixed()) ? Integer.parseInt(p.getFixed()) == cartTotal : true;
+
+
+        return condition1 && condition2 && condition3;
+    }
+
+    private List<OrderLineItemRestBean> removeAllPromotion(List<OrderLineItemRestBean> cart) {
+        List<OrderLineItemRestBean> item = null;
+        //I will pass the original cart model here
+        for (int i = 0; i < item.size(); i++) {
+            OrderLineItemRestBean currentItem = item.get(i);
+            if (!currentItem.getItemPromotions().isEmpty()) {
+                currentItem.setDiscount(BigDecimal.ZERO);
+                currentItem.setUnitPrice(currentItem.getOriginalPrice());
+            }
+        }
+        return item;
+    }
+
+    private List<OrderLineItemRestBean> resetCart(List<OrderLineItemRestBean> cart) {
+        List<OrderLineItemRestBean> item = null;
+        //I will pass the original cart model here
+        List<OrderLineItemRestBean> newCart = null;
+        HashMap<String, Integer> cartmap = null;
+        for (int j = 0; j < item.size(); j++) {
+            //I got the current item here
+            OrderLineItemRestBean currentItem = item.get(j);
+            if (cartmap.containsKey(currentItem.getSkuid())) {
+                //Then increase its Quantity
+                int Index = newCart.indexOf(currentItem);
+                int newItem = newCart.get(Index).getQuantity();
+                newCart.get(Index).setQuantity(newItem + currentItem.getQuantity());
+            } else {
+                //This item was not present earlier
+                cartmap.put(currentItem.getSkuid(), currentItem.getQuantity());
+                newCart.add(currentItem);
+            }
+        }
+        return item;
     }
 
     private void apply_promotion_service() {
