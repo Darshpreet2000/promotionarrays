@@ -4,7 +4,7 @@
     List<promotions> PURCHASE_VALUE_PROMOTIONS = new ArrayList<>();
     List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
 
-   private void promote() {
+  private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
             if (promote.getTarget().equals("ALL")) {
@@ -100,6 +100,21 @@
                                 }
                                 break;
                             case "FIXED_PRICE":
+                                for (int j = 0; j < Cart.size(); j++) {
+                                    OrderLineItemRestBean el = Cart.get(j);
+                                    if (checkForIncludes(current, el) && searchForIteminCart(Cart, el.getProductSku(), current) < current.getItemPromotionQuantity()) {
+                                        if (el.getQuantity() <= current.getItemPromotionQuantity()) {
+                                            LineItemPromotionBean p = null;
+                                            BigDecimal AmountSaved = current.isDiscountInPercentage() ? (el.getOriginalPrice().precision() * current.getDiscountAmount() / 100) : ((el.getOriginalPrice() * ((((((el.getOriginalPrice() / cartTotal) * current.getDiscountAmount())) * 100) / el.getOriginalPrice()))) / 100);
+                                            p.setPromotionId(current.getPromotionid());
+                                            p.setAmountSaved((BigDecimal.valueOf(el.getQuantity()).multiply(AmountSaved)));
+                                            p.setName(current.getPromotion());
+                                            el.getItemPromotions().add(p);
+                                            el.setDiscount(BigDecimal.valueOf(100));
+                                        }
+                                    }
+                                }
+
                                 break;
                         }
                     }
@@ -292,4 +307,5 @@
         }
         return -1;
     }
+
 
