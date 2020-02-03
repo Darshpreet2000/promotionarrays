@@ -4,7 +4,7 @@
     List<promotions> PURCHASE_VALUE_PROMOTIONS = new ArrayList<>();
     List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
 
-  private void promote() {
+    private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
             if (promote.getTarget().equals("ALL")) {
@@ -104,27 +104,46 @@
                                     OrderLineItemRestBean el = Cart.get(j);
                                     if (checkForIncludes(current, el) && searchForIteminCart(Cart, el.getProductSku(), current) < current.getItemPromotionQuantity()) {
                                         if (el.getQuantity() <= current.getItemPromotionQuantity()) {
-                                            LineItemPromotionBean p = null;
-                                            BigDecimal AmountSaved = current.isDiscountInPercentage() ? (el.getOriginalPrice().precision() * current.getDiscountAmount() / 100) : ((el.getOriginalPrice() * ((((((el.getOriginalPrice() / cartTotal) * current.getDiscountAmount())) * 100) / el.getOriginalPrice()))) / 100);
-                                            p.setPromotionId(current.getPromotionid());
-                                            p.setAmountSaved((BigDecimal.valueOf(el.getQuantity()).multiply(AmountSaved)));
-                                            p.setName(current.getPromotion());
-                                            el.getItemPromotions().add(p);
-                                            el.setDiscount(BigDecimal.valueOf(100));
+                                            BigDecimal amountSaved = BigDecimal.valueOf(((el.getOriginalPrice().subtract(BigDecimal.valueOf(current.getDiscountAmount()))).divide(el.getOriginalPrice())).intValue() * 100);
+                                            if (el.getQuantity() <= current.getItemPromotionQuantity()) {
+                                                LineItemPromotionBean p = null;
+                                                p.setPromotionId(current.getPromotionid());
+                                                p.setAmountSaved((BigDecimal.valueOf(el.getQuantity()).multiply(amountSaved)));
+                                                p.setName(current.getPromotion());
+                                                p.setCoupon(current.getTarget().equals("COUPON"));
+                                                el.getItemPromotions().add(p);
+
+                                                el.setDiscount(BigDecimal.valueOf(Math.min(el.getDiscount().longValue() + (((el.getOriginalPrice().subtract(BigDecimal.valueOf(current.getDiscountAmount()))).divide(el.getOriginalPrice()).intValue() * 100)), 100)));
+                                            } else {
+                                                OrderLineItemRestBean newObj = el;
+                                                el.setQuantity(current.getItemPromotionQuantity());
+                                                LineItemPromotionBean p = null;
+                                                p.setPromotionId(current.getPromotionid());
+
+                                                p.setAmountSaved(amountSaved.multiply(BigDecimal.valueOf(Math.min(current.getItemPromotionQuantity(), el.getQuantity()))));
+                                                p.setName(current.getPromotion());
+                                                p.setCoupon(current.getTarget().equals("COUPON"));
+                                                el.getItemPromotions().add(p);
+                                                el.setDiscount(new BigDecimal(Math.min(el.getDiscount().add((el.getOriginalPrice().subtract(BigDecimal.valueOf(current.getDiscountAmount()))).divide(el.getOriginalPrice()).multiply(new BigDecimal(100)), new MathContext(4)).intValue(), 100)));
+                                                newObj.setQuantity(newObj.getQuantity() - current.getItemPromotionQuantity());
+
+                                                Cart.add(newObj);
+                                            }
                                         }
+
+                                        break;
                                     }
                                 }
-
-                                break;
                         }
+
                     }
                 }
-
             }
         }
     }
 
-    private boolean searchForTheAppliedPromotion(String promotion, List<LineItemPromotionBean> itemPromotions) {
+    private boolean searchForTheAppliedPromotion(String
+                                                         promotion, List<LineItemPromotionBean> itemPromotions) {
 
         for (int i = 0; i < itemPromotions.size(); i++) {
             if (itemPromotions.get(i).getName().equals(promotion))
@@ -133,7 +152,8 @@
         return false;
     }
 
-    private int searchForIteminCart(List<OrderLineItemRestBean> cart, String sku, promotions current) {
+    private int searchForIteminCart(List<OrderLineItemRestBean> cart, String
+            sku, promotions current) {
         int count = 0;
         for (int i = 0; i < cart.size(); i++) {
             OrderLineItemRestBean el = cart.get(i);
@@ -163,7 +183,8 @@
         return condition1 && condition2 && condition3;
     }
 
-    private List<OrderLineItemRestBean> removeAllPromotion(List<OrderLineItemRestBean> cart) {
+    private List<OrderLineItemRestBean> removeAllPromotion
+            (List<OrderLineItemRestBean> cart) {
         List<OrderLineItemRestBean> item = null;
         //I will pass the original cart model here
         for (int i = 0; i < item.size(); i++) {
@@ -307,5 +328,6 @@
         }
         return -1;
     }
+
 
 
