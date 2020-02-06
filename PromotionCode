@@ -4,6 +4,7 @@
     List<promotions> PURCHASE_VALUE_PROMOTIONS = new ArrayList<>();
     List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
 
+   
     private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
@@ -19,6 +20,15 @@
         }
         List<promotions> concatenated = new ArrayList<promotions>(ON_PURCHASE_VALUE);
         concatenated.addAll(ON_PURCHASE_ITEM);
+        Collections.sort(concatenated, new Comparator<promotions>() {
+            @Override
+            public int compare(promotions o1, promotions o2) {
+                if (o1.getPriority() > o2.getPriority())
+                    return 1;
+                else
+                    return 0;
+            }
+        });
 
         List<OrderLineItemRestBean> Cart = null;
         //I will pass the original cart model here
@@ -138,8 +148,92 @@
 
                     }
                 }
+            } else if (current.getCondition().equals("ON_PURCHASE_ITEM")) {
+                if (i == 0) {
+                    Cart = resetCart(Cart);
+                    Cart = removeAllPromotion(Cart);
+                }
+
+                switch (current.getRewardType()) {
+                    case "ON_VALUE":
+                        int asr = current.getAmountSavingReward();
+                        for (int j = 0; j < Cart.size(); j++) {
+                            OrderLineItemRestBean el = Cart.get(j);
+                            if (checkForIncludes(current, el) && cumulativeCheck(el.getProductSku(), current, Cart)) {
+                                int amountSaved = current.isDiscountInPercentage() ? ((el.getOriginalPrice().intValue() * current.getDiscountAmount().intValue()) / 100) : Math.min(current.getDiscountAmount().intValue(), el.getOriginalPrice().intValue());
+                                if (!current.getFixed().isEmpty()) {
+                                    String fixedQty = current.getFixed();
+                                    int originalQty = el.getQuantity();
+                                    OrderLineItemRestBean newObj = el;
+
+                                    if (originalQty >= Integer.parseInt(fixedQty)) {
+                                        LineItemPromotionBean p = null;
+                                        p.setPromotionId(current.getPromotionid());
+                                        p.setAmountSaved(BigDecimal.valueOf(amountSaved * Math.min(el.getQuantity(), Integer.parseInt(fixedQty))));
+                                        p.setName(current.getPromotion());
+                                        p.setCoupon(current.getTarget().equals("COUPON"));
+                                        el.getItemPromotions().add(p);
+                                        el.setQuantity(Math.min(originalQty, Integer.parseInt(fixedQty)));
+                                        el.setDiscount(BigDecimal.valueOf(Math.min(el.getDiscount().longValue() + (current.isDiscountInPercentage() ? current.getDiscountAmount() : ((100 * amountSaved) / el.getOriginalPrice().intValue())), 100)));
+                                    }
+
+                                    if (originalQty > Integer.parseInt(fixedQty)) {
+                                        int tempCount = 0;
+                                        for (int k = Integer.parseInt(fixedQty); k < originalQty; k = k + Integer.parseInt(fixedQty)) {
+                                            int remainingQtySoFar = originalQty - i;
+                                            OrderLineItemRestBean tempObj = newObj;
+                                            tempObj.setQuantity(Math.min(remainingQtySoFar, Integer.parseInt(fixedQty)));
+                                            if (remainingQtySoFar >= Integer.parseInt(fixedQty)) {
+
+                                                LineItemPromotionBean p = null;
+                                                p.setPromotionId(current.getPromotionid());
+                                                p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * Math.min(remainingQtySoFar, Integer.parseInt(fixedQty)))));
+                                                p.setName(current.getPromotion());
+                                                p.setCoupon(current.getTarget().equals("COUPON"));
+                                                tempObj.getItemPromotions().add(p);
+                                                tempObj.setDiscount(BigDecimal.valueOf(Math.min(((current.isDiscountInPercentage() ? current.getDiscountAmount() : ((100 * amountSaved) / el.getOriginalPrice().intValue()))), 100)));
+                                            } else {
+                                                tempObj.setDiscount(BigDecimal.ZERO);
+                                            }
+                                            Cart.add(tempObj);
+
+                                        }
+                                    } else {
+                                        LineItemPromotionBean p = null;
+                                        p.setPromotionId(current.getPromotionid());
+                                        p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * el.getQuantity())));
+                                        p.setName(current.getPromotion());
+                                        p.setCoupon(current.getTarget().equals("COUPON"));
+                                        el.getItemPromotions().add(p);
+                                    }
+                                }
+                            }
+                        }
+
+                }
+                break;
             }
+
         }
+
+    }
+
+}
+
+    private boolean cumulativeCheck(String sku, promotions
+            p, List<OrderLineItemRestBean> cart) {
+        if (p.isCumulative()) return true;
+
+        int count = 0;
+        for (int j = 0; j < cart.size(); j++) {
+            OrderLineItemRestBean el = cart.get(j);
+            count += (el.getProductSku().equals(sku)) ? el.getQuantity() : 0;
+        }
+
+        boolean condition1 = Boolean.parseBoolean(p.getMin()) ? (Integer.parseInt(p.getMin()) <= count) : true;
+        boolean condition2 = Boolean.parseBoolean(p.getMax()) ? (Integer.parseInt(p.getMax()) >= count) : true;
+        boolean condition3 = Boolean.parseBoolean(p.getFixed()) ? (Integer.parseInt(p.getFixed()) == count) : true;
+        return condition1 && condition2 && condition3;
     }
 
     private boolean searchForTheAppliedPromotion(String
