@@ -5,6 +5,7 @@
     List<promotions> PURCHASE_ITEM_PROMOTIONS = new ArrayList<>();
 
    
+   
     private void promote() {
         for (int i = 0; i < promotionsList.size(); i++) {
             promotions promote = promotionsList.get(i);
@@ -209,17 +210,183 @@
                                 }
                             }
                         }
+                        break;
+                    case "ON_ITEM":
+                        Cart = resetCart(Cart);
+                        Cart = expandCart(Cart, current, i);
+                        for (int j = 0; j < Cart.size(); j++) {
+                            OrderLineItemRestBean el = Cart.get(j);
+                            //checks if item qualifies, count of discounted items so far
+                            if (checkForIncludes(current, el) && generalCheckForPromoType(el, 'ON_ITEM')) {
+
+                                int amountSaved = current.isFreeitem() ? (calculateDiscountForFreeItem(el.getProductSku(), current, Cart) ? el.getOriginalPrice().intValue() : 0) : (current.isDiscountInPercentage() ? (current.getDiscountAmount().intValue()) : current.getDiscountAmount().intValue());
+
+                                if (!current.getFixed().isEmpty()) {
+
+                                    if (checkForItemPromotionGeneral(el.getProductSku(), current, Cart, current.getItemPromotionQuantity()) && el.getItemPromotions().isEmpty()) {
+
+                                        LineItemPromotionBean p = null;
+                                        p.setPromotionId(current.getPromotionid());
+                                        p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * el.getQuantity())));
+                                        p.setName(current.getPromotion());
+                                        p.setCoupon(current.getTarget().equals("COUPON"));
+                                        el.getItemPromotions().add(p);
+                                        el.setDiscount(BigDecimal.valueOf(current.isFreeitem() ? (calculateDiscountForFreeItem(el.getProductSku(), current, Cart) ? 100 : 0) : (current.isDiscountInPercentage() ? amountSaved : (current.getDiscountAmount() * 100) / el.getOriginalPrice().intValue())));
+                                    }
+
+                                } else {
+
+                                    if (checkForItemPromotionGeneral(el.getProductSku(), current, Cart, current.getItemPromotionQuantity()) && el.getItemPromotions().isEmpty()) {
+
+                                        LineItemPromotionBean p = null;
+                                        p.setPromotionId(current.getPromotionid());
+                                        p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * * el.getQuantity())))
+                                        ;
+                                        p.setName(current.getPromotion());
+                                        p.setCoupon(current.getTarget().equals("COUPON"));
+
+                                        el.getItemPromotions().add(p);
+                                        el.setDiscount(current.isFreeitem() ? (calculateDiscountInMinMaxCase(el.getProductSku(), current, Cart) ? 100 : 0) : (current.isDiscountInPercentage() ? amountSaved : (current.getDiscountAmount() * 100) / el.getOriginalPrice()));
+
+                                    }
+                                }
+
+                            }
+                        }
+
+                        if (i == Cart.size() - 1) {
+                            Cart = shrinkCart(Cart, ipr.freeItem);
+                        }
+                        break;
+
+                    case "FIXED_PRICE":
+                        int pfa = current.getPayFixedAmountReward();
+                        Cart = expandCart(Cart, current, i);
+                        for (int j = 0; j < Cart.size(); j++) {
+                            OrderLineItemRestBean el = Cart.get(j);
+                            if (checkForIncludes(current, el) && checkForPromoType(el)) {
+
+                                int amountSaved = (el.getOriginalPrice() > current.getDiscountAmount()) ? parseFloat(el.getOriginalPrice() - current.getDiscountAmount()) : 0;
+                                if (promotionToApply.promotionRule.fixed) {
+                                    if (checkForTheCurrentItemQuantity(Cart, el, current) && el.getItemPromotions().isEmpty()) {
+
+                                        LineItemPromotionBean p = null;
+                                        p.setPromotionId(current.getPromotionid());
+                                        p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * el.getQuantity())));
+                                        p.setName(current.getPromotion());
+                                        p.setCoupon(current.getTarget().equals("COUPON"));
+
+                                        el.getItemPromotions().add(p);
+                                        el.setDiscount(BigDecimal.valueOf(Math.min((((el.getOriginalPrice().longValue() - Math.min(current.getDiscountAmount(), el.getOriginalPrice().longValue())) / el.getOriginalPrice().longValue()) * 100), 100)));
+                                    }
+
+                                } else {
+
+                                    LineItemPromotionBean p = null;
+                                    p.setPromotionId(current.getPromotionid());
+                                    p.setAmountSaved(BigDecimal.valueOf(Math.round(amountSaved * el.getQuantity())));
+                                    p.setName(current.getPromotion());
+                                    p.setCoupon(current.getTarget().equals("COUPON"));
+
+                                    el.getItemPromotions().add(p);
+                                    el.setDiscount(BigDecimal.valueOf(Math.min((((el.getOriginalPrice().longValue() - Math.min(current.getDiscountAmount(), el.getOriginalPrice().longValue())) / el.getOriginalPrice().longValue()) * 100), 100)));
+
+                                }
+                            }
+
+                            if (i == Cart.size() - 1) {
+                                Cart = shrinkCart(Cart, ipr.freeItem);
+                            }
+                        }
+                        break;
 
                 }
-                break;
+
             }
 
         }
-
     }
 
-}
 
+    // shrink cart with promoted and non promoted items
+    private List<OrderLineItemRestBean> shrinkCart(List<OrderLineItemRestBean> cart, freeItem) {
+
+        Map<String,Boolean> itemMap = new HashMap<>();
+        List<OrderLineItemRestBean> newCart=new ArrayList<>();
+        for(int i=0;i<cart.size();i++){
+            OrderLineItemRestBean item=cart.get(i);
+            OrderLineItemRestBean newItem = item;
+            //checks if same item is in newCart with the same promotion
+            if(newItem.getItemPromotions().size() && itemMap.get(newItem.getProductSku()+newItem.getItemPromotions().get(0).getPromotionId()) && !freeItem){
+                int index2 = 0;
+                        for(int j=0;j<newCart.size();j++) {
+                            OrderLineItemRestBean o=newCart.get(j);
+                            if((o.getProductSku() == newItem.getProductSku() && (o.getItemPromotions().get(0).getPromotionId() ==o.getItemPromotions().get(0).getPromotionId()))){
+                               index2=j;
+                               break;
+                            }
+                        }
+                newCart.get(index2).getItemPromotions().get(0).setAmountSaved(newCart.get(index2).getItemPromotions().get(0).getAmountSaved().add(newItem.getItemPromotions().get(0).getAmountSaved()));
+                newCart.get(index2).setQuantity(newCart.get(index2).getQuantity()+newItem.getQuantity()) ;
+            } else if(!newItem.getItemPromotions().isEmpty()){
+                itemMap.put(newItem.getProductSku()+newItem.getItemPromotions().get(0).getPromotionId(),true);
+                newCart.add(newItem);
+            } else {
+                if(itemMap.get(newItem.getProductSku())){
+                    int index3 = 0;
+                    for(int j=0;j<newCart.size();j++) {
+                        OrderLineItemRestBean o=newCart.get(j);
+                        if(o.getProductSku() == newItem.getProductSku()){
+                            index3=j;
+                            break;
+                        }
+                    }
+
+                    newCart.get(index3).setQuantity(newCart.get(index3).getQuantity()+newItem.getQuantity());
+                } else {
+                    itemMap.put(newItem.getProductSku(),true);
+                    newCart.add(newItem);
+                }
+            }
+        }
+
+        return newCart;
+     }
+
+   private List<OrderLineItemRestBean> expandCart(List<OrderLineItemRestBean> cart, promotions p, int index){
+
+       List<OrderLineItemRestBean> newCart =new ArrayList<>();
+      int totalItemDoneSoFar = 0;
+      int tempCartItems2 = 0;
+       HashMap<String,Integer> includeItemObj = new HashMap<>();
+
+       // creating new cart with line items = total quantity
+       for(int j=0;j<cart.size();j++){
+           OrderLineItemRestBean el=cart.get(j);
+           for(int i = 0; i < el.getQuantity(); i++){
+              OrderLineItemRestBean newObj = el;
+               newObj.setQuantity(1);
+               newCart.add(newObj);
+           }
+       }
+
+       //calculate total qualified unpromoted items
+       // creates item:quantity map
+       for(int i=0;i<newCart.size();i++){
+     OrderLineItemRestBean el=newCart.get(i);
+           tempCartItems2 += checkForIncludes(p,el) && el.getItemPromotions().isEmpty() ? el.getQuantity() : 0;
+           includeItemObj.put(el.getProductSku(),(includeItemObj.containsKey(el.getProductSku())?includeItemObj.get(el.getProductSku()): 0) + el.getQuantity());
+       }
+
+
+       String fixedQty = p.getFixed();
+
+       if(Boolean.getBoolean(fixedQty) && (tempCartItems2 % Integer.parseInt(fixedQty) != 0)){
+           tempCartItems2 = tempCartItems2/Integer.parseInt(fixedQty)*Integer.parseInt(fixedQty);
+       }
+       return newCart;
+
+   }
     private boolean cumulativeCheck(String sku, promotions
             p, List<OrderLineItemRestBean> cart) {
         if (p.isCumulative()) return true;
@@ -236,8 +403,7 @@
         return condition1 && condition2 && condition3;
     }
 
-    private boolean searchForTheAppliedPromotion(String
-                                                         promotion, List<LineItemPromotionBean> itemPromotions) {
+    private boolean searchForTheAppliedPromotion(String promotion, List<LineItemPromotionBean> itemPromotions) {
 
         for (int i = 0; i < itemPromotions.size(); i++) {
             if (itemPromotions.get(i).getName().equals(promotion))
@@ -422,6 +588,113 @@
         }
         return -1;
     }
+
+
+    private boolean checkForPromoType(OrderLineItemRestBean item){
+        List<LineItemPromotionBean> promotions =new ArrayList<>();
+        for(int i=0;i<item.getItemPromotions().size();i++){
+            if(item.getItemPromotions().get(i).getpromotype().equals('FIXED_PRICE')){
+                promotions.add(item.getItemPromotions().get(i));
+            }
+        }
+        return promotions.isEmpty();
+    }
+
+    private boolean generalCheckForPromoType(OrderLineItemRestBean item,String check){
+        List<LineItemPromotionBean> promotions =new ArrayList<>();
+        for(int i=0;i<item.getItemPromotions().size();i++){
+            if(item.getItemPromotions().get(i).getpromotype().equals(check)){
+                promotions.add(item.getItemPromotions().get(i));
+            }
+        }
+
+        return promotions.isEmpty();
+    }
+
+    //calculate discount for free items
+    private boolean calculateDiscountForFreeItem( String sku,promotions p,List<OrderLineItemRestBean> cart){
+
+       int totalSku = 0;
+        int promotedQty = 0;
+        int freedQty = p.getItemPromotionQuantity();
+        int fixedQty = Integer.parseInt(p.getFixed());
+        boolean cumulativeFlag = p.isCumulative();
+
+        for(int i=0;i<cart.size();i++){
+        OrderLineItemRestBean el=cart.get(i);
+            if(cumulativeFlag){
+                totalSku++;
+                if(el.getDiscount().intValue() > 0){
+                    promotedQty++;
+                }
+            } else {
+                if(el.getProductSku().equals(sku)){
+                    totalSku++;
+                    if(el.getDiscount().intValue()> 0){
+                        promotedQty++;
+                    }
+                }
+            }
+        }
+
+        int totalPromotableQty = (totalSku/fixedQty) * freedQty;
+        return (totalSku >= fixedQty) && (promotedQty < totalPromotableQty);
+    }
+
+    private boolean calculateDiscountInMinMaxCase (String sku,promotions p,List<OrderLineItemRestBean> cart){
+       int promotedQty = 0;
+        int freedQty = p.promotionRule.itemPromotionReward.quantity;
+        boolean cumulativeFlag = p.isCumulative();
+
+        for(int i=0;i<cart.size();i++){
+            OrderLineItemRestBean el=cart.get(i);
+            if(cumulativeFlag){
+                if(el.getDiscount().intValue()> 0){
+                    promotedQty++;
+                }
+            } else {
+                if(el.getProductSku().equals(sku) ){
+                    if(el.getDiscount().intValue() > 0){
+                        promotedQty++;
+                    }
+                }
+            }
+        }
+
+        return (promotedQty < freedQty);
+
+    };
+
+    private boolean checkForItemPromotionGeneral(String sku,promotions p,List<OrderLineItemRestBean> cart,int discountedQty){
+        int totalSku = 0;
+        int promotedQty = 0;
+        int fixedQty = Integer.parseInt(p.getFixed());
+        int minQty = Integer.parseInt(p.getMin());
+        int maxQty = Integer.parseInt(p.getMax());
+        boolean cumulativeFlag = p.isCumulative();
+
+        for(int i=0;i<cart.size();i++){
+            OrderLineItemRestBean el=cart.get(i);
+            if(cumulativeFlag){
+                totalSku++;
+                if(el.getItemPromotions().size() > 0){
+                    promotedQty++;
+                }
+            } else {
+                if(el.getProductSku().equals(sku)){
+                    totalSku++;
+                    if(el.getItemPromotions().size() > 0){
+                        promotedQty++;
+                    }
+                }
+            }
+        }
+
+        int totalPromotableQty =  fixedQty ?  ((totalSku/fixedQty) * fixedQty) : ((totalSku >= minQty && totalSku <= maxQty) ? discountedQty : 0);
+
+        return promotedQty < totalPromotableQty;
+
+    };
 
 
 
